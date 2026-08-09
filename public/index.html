@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d1117">
+<title>PathMapper</title>
+<style>
+  /* ---------- base / high-contrast mobile-first ---------- */
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #0d1117;
+    color: #f0f3f6;
+    font-size: 17px;
+    line-height: 1.4;
+    overscroll-behavior: none;
+  }
+  .screen { display: none; min-height: 100%; padding: 16px 16px 120px; max-width: 640px; margin: 0 auto; }
+  .screen.active { display: block; }
+
+  h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px; }
+  h1 .accent { color: #ffd23f; }
+  .subtitle { color: #9aa4b2; font-size: 15px; margin-bottom: 24px; }
+  h2 { font-size: 19px; font-weight: 700; margin: 20px 0 10px; }
+
+  label.field-label { display: block; font-size: 15px; font-weight: 600; color: #c3ccd6; margin: 14px 0 6px; }
+
+  input[type=text], input[type=password], textarea {
+    width: 100%;
+    min-height: 56px;
+    padding: 14px;
+    font-size: 18px;
+    color: #f0f3f6;
+    background: #161c25;
+    border: 2px solid #39424e;
+    border-radius: 12px;
+    outline: none;
+  }
+  textarea { min-height: 72px; resize: vertical; }
+  input:focus, textarea:focus { border-color: #ffd23f; }
+
+  button {
+    min-height: 56px;
+    padding: 0 18px;
+    font-size: 18px;
+    font-weight: 700;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    color: #0d1117;
+    background: #ffd23f;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  button:active { transform: scale(0.98); }
+  button:disabled { opacity: 0.4; }
+  button.secondary { background: #232c38; color: #f0f3f6; border: 2px solid #39424e; }
+  button.danger-outline { background: transparent; color: #ff7b72; border: 2px solid #ff7b72; }
+  .btn-row { display: flex; gap: 10px; margin-top: 12px; }
+  .btn-row button { flex: 1; }
+  .mt { margin-top: 14px; }
+
+  .card { background: #161c25; border: 1px solid #2b3441; border-radius: 16px; padding: 16px; margin-top: 16px; }
+  .card.draft { border-color: #b8860b; background: #221c10; }
+
+  /* quick-pick chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .chips button {
+    width: auto; min-height: 48px; padding: 0 16px; font-size: 16px; font-weight: 600;
+    background: #232c38; color: #ffd23f; border: 2px solid #39424e; border-radius: 999px;
+  }
+
+  /* ---------- entity lists (places / rooms) ---------- */
+  ul.entity-list { list-style: none; }
+  ul.entity-list li { display: flex; gap: 10px; margin-bottom: 10px; align-items: stretch; }
+  ul.entity-list li > button.main {
+    flex: 1; justify-content: flex-start; text-align: left; background: #232c38; color: #f0f3f6;
+    border: 2px solid #39424e; flex-direction: column; align-items: flex-start; padding: 12px 16px; gap: 2px;
+  }
+  ul.entity-list .sm { font-size: 13px; font-weight: 400; color: #9aa4b2; }
+  ul.entity-list .del {
+    width: 56px; min-height: 56px; flex-shrink: 0; background: transparent;
+    color: #ff7b72; border: 2px solid #3a2a2a; border-radius: 12px; font-size: 22px; padding: 0;
+  }
+
+  /* ---------- camera ---------- */
+  #cameraWrap { position: relative; border-radius: 16px; overflow: hidden; background: #000; margin-top: 8px; }
+  #cameraVideo { width: 100%; display: block; max-height: 50vh; object-fit: cover; background: #000; }
+  #cameraError {
+    display: none; padding: 20px; background: #2a1f14; border: 2px solid #b8860b;
+    border-radius: 16px; margin-top: 8px; color: #ffe9a8; font-size: 16px;
+  }
+  #fileFallbackLabel {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 64px; margin-top: 12px; background: #ffd23f; color: #0d1117;
+    border-radius: 14px; font-size: 18px; font-weight: 700; cursor: pointer;
+  }
+  #fileFallbackInput { display: none; }
+
+  #captureBtn { margin-top: 12px; min-height: 72px; font-size: 22px; }
+
+  /* ---------- pending waypoint form ---------- */
+  #pendingThumb { width: 100%; max-height: 40vh; object-fit: contain; border-radius: 12px; background: #000; display: block; }
+  .ai-row { display: flex; gap: 10px; align-items: stretch; margin-top: 8px; }
+  #aiDescribeBtn { background: #2f81f7; color: #fff; }
+  #aiDescribeBtn.busy { opacity: 0.6; }
+
+  /* ---------- waypoint list ---------- */
+  #wpList { list-style: none; margin-top: 8px; }
+  #wpList li {
+    display: flex; align-items: center; gap: 12px;
+    background: #161c25; border: 1px solid #2b3441; border-radius: 14px;
+    padding: 10px; margin-bottom: 10px;
+  }
+  #wpList img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; background: #000; flex-shrink: 0; }
+  #wpList .wp-meta { flex: 1; min-width: 0; }
+  #wpList .wp-label { font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #wpList .wp-sub { font-size: 13px; color: #9aa4b2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #wpList .wp-del {
+    width: 56px; min-height: 56px; flex-shrink: 0; background: transparent;
+    color: #ff7b72; border: 2px solid #3a2a2a; border-radius: 12px; font-size: 24px; padding: 0;
+  }
+  .empty-note { color: #9aa4b2; font-size: 15px; padding: 8px 2px; }
+  .hint { color: #9aa4b2; font-size: 14px; margin-top: 6px; }
+
+  /* ---------- toast ---------- */
+  #toast {
+    position: fixed; left: 12px; right: 12px; bottom: 20px; z-index: 99;
+    padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 600;
+    background: #1c2633; color: #f0f3f6; border: 2px solid #39424e;
+    transform: translateY(150%); transition: transform 0.25s ease; text-align: center;
+  }
+  #toast.show { transform: translateY(0); }
+  #toast.error { background: #3a1d1d; border-color: #ff7b72; color: #ffc9c4; }
+  #toast.ok { background: #16311f; border-color: #3fb950; color: #c8f0d0; }
+
+  details summary { min-height: 56px; display: flex; align-items: center; font-weight: 700; cursor: pointer; font-size: 17px; }
+  .keyhint { font-size: 13px; color: #9aa4b2; margin-top: 8px; }
+
+  .topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .topbar button { width: auto; min-width: 56px; }
+  .topbar .loc-name { font-size: 18px; font-weight: 800; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .count-badge { background: #232c38; border: 1px solid #39424e; border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 700; color: #ffd23f; }
+</style>
+</head>
+<body>
+
+<!-- ===================== PLACES SCREEN ===================== -->
+<div id="screenPlaces" class="screen active">
+  <h1>Path<span class="accent">Mapper</span></h1>
+  <p class="subtitle">Map a home or office room by room. Every important spot — fridge, radio, toilet, water — gets its own photo so the navigation device can guide to it.</p>
+
+  <!-- unsaved-draft recovery card -->
+  <div id="draftCard" class="card draft" style="display:none">
+    <h2 style="margin-top:0">Unfinished room found</h2>
+    <p class="empty-note" id="draftInfo"></p>
+    <div class="btn-row">
+      <button id="resumeDraftBtn">Continue mapping it</button>
+      <button id="discardDraftBtn" class="danger-outline">Discard</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label class="field-label" for="placeInput">New place</label>
+    <input type="text" id="placeInput" placeholder="e.g. Amma's house, Office" autocomplete="off">
+    <button id="newPlaceBtn" class="mt">Open this place</button>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Your places</h2>
+    <ul id="placesList" class="entity-list"></ul>
+    <p id="noPlacesNote" class="empty-note">Loading…</p>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>Settings — AI photo description (optional)</summary>
+      <label class="field-label" for="apiKeyInput">Claude API key</label>
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off">
+      <div class="btn-row">
+        <button id="saveKeyBtn" class="secondary">Save key</button>
+        <button id="clearKeyBtn" class="danger-outline">Clear key</button>
+      </div>
+      <p class="keyhint">Stored only in this phone's browser. With a key set, an "AI describe" button appears on each spot to auto-fill notes. The app works fully without it.</p>
+    </details>
+  </div>
+</div>
+
+<!-- ===================== ROOMS SCREEN ===================== -->
+<div id="screenRooms" class="screen">
+  <div class="topbar">
+    <button id="roomsBackBtn" class="secondary" aria-label="Back to places">←</button>
+    <div class="loc-name" id="placeNameDisplay"></div>
+  </div>
+
+  <div class="card">
+    <label class="field-label" for="roomInput">Map a room / area</label>
+    <input type="text" id="roomInput" placeholder="e.g. Kitchen" autocomplete="off">
+    <div class="chips" id="roomChips"></div>
+    <button id="startRoomBtn" class="mt">Start mapping this room</button>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Rooms mapped</h2>
+    <ul id="roomsList" class="entity-list"></ul>
+    <p id="noRoomsNote" class="empty-note">Nothing mapped here yet. Pick a room above to begin.</p>
+    <p class="hint">Tap a room to add more spots to it. ✕ removes a room's map.</p>
+  </div>
+</div>
+
+<!-- ===================== CAPTURE SCREEN ===================== -->
+<div id="screenCapture" class="screen">
+  <div class="topbar">
+    <button id="captureBackBtn" class="secondary" aria-label="Back to rooms">←</button>
+    <div class="loc-name" id="roomNameDisplay"></div>
+    <div class="count-badge" id="wpCount">0 spots</div>
+  </div>
+  <p class="hint" style="margin-bottom:8px">Photograph every spot that matters in this room — doors, fridge, radio, water, toilet, switches — one photo per spot.</p>
+
+  <!-- live camera -->
+  <div id="cameraSection">
+    <div id="cameraWrap">
+      <video id="cameraVideo" autoplay playsinline muted></video>
+    </div>
+    <div id="cameraError">
+      <strong>Camera unavailable.</strong>
+      <span id="cameraErrorMsg">Permission was denied or no camera was found.</span>
+      You can still capture spots with your phone's camera app below.
+      <label id="fileFallbackLabel" for="fileFallbackInput">📷 Take photo</label>
+      <input type="file" id="fileFallbackInput" accept="image/*" capture="environment">
+    </div>
+    <button id="captureBtn">📸 Capture Spot</button>
+  </div>
+
+  <!-- pending waypoint form (after a capture) -->
+  <div id="pendingSection" class="card" style="display:none">
+    <img id="pendingThumb" alt="Captured spot photo">
+
+    <label class="field-label" for="wpLabel">What is this spot? *</label>
+    <input type="text" id="wpLabel" placeholder="e.g. Fridge" autocomplete="off">
+    <div class="chips" id="labelChips"></div>
+
+    <label class="field-label" for="wpTransition" id="transitionLabel">How to get here from the previous spot</label>
+    <input type="text" id="wpTransition" placeholder="e.g. 4 steps forward, slight left" autocomplete="off">
+
+    <label class="field-label" for="wpNotes">Notes — hazards, details (optional)</label>
+    <textarea id="wpNotes" placeholder="e.g. handle on right side; wet floor near this"></textarea>
+    <div class="ai-row">
+      <button id="aiDescribeBtn" type="button">✨ AI describe photo</button>
+    </div>
+
+    <div class="btn-row">
+      <button id="retakeBtn" class="secondary">Retake</button>
+      <button id="saveWpBtn">Save Spot</button>
+    </div>
+  </div>
+
+  <!-- saved spots, always visible -->
+  <h2>Spots in this room</h2>
+  <ul id="wpList"></ul>
+  <p id="noWpNote" class="empty-note">No spots yet. Stand near the room entrance and capture the first one.</p>
+
+  <button id="finishBtn" class="mt" disabled>✅ Finish &amp; Save room</button>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var LS_API_KEY = 'pathmapper_api_key';
+  var LS_DRAFT_KEY = 'pathmapper_draft';   // safety net: room not yet on the server
+  var MAX_EDGE = 1024;                      // max long edge in px for stored photos
+  var JPEG_QUALITY = 0.7;
+
+  var ROOM_SUGGESTIONS = ['Entrance', 'Living room', 'Kitchen', 'Bedroom', 'Bathroom', 'Toilet', 'Dining', 'Balcony', 'Corridor'];
+  var SPOT_SUGGESTIONS = ['Door', 'Bed', 'Fridge', 'Water dispenser', 'Radio', 'TV', 'Sofa', 'Chair', 'Sink / tap', 'Toilet seat', 'Light switch', 'Wardrobe', 'Medicine shelf', 'Dustbin'];
+
+  // ---------- session state ----------
+  var state = {
+    placeName: '',
+    roomName: '',
+    createdAt: null,
+    waypoints: [],            // { label, notes, transition, photo (dataURL) }
+    pendingPhoto: null,
+    savedToServer: false
+  };
+  var stream = null;
+  var cameraFailed = false;
+
+  // ---------- tiny helpers ----------
+  function $(id) { return document.getElementById(id); }
+
+  var toastTimer = null;
+  function toast(msg, kind) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = 'show' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.className = ''; }, 3500);
+  }
+
+  function getApiKey() {
+    try { return localStorage.getItem(LS_API_KEY) || ''; } catch (e) { return ''; }
+  }
+
+  function showScreen(id) {
+    ['screenPlaces', 'screenRooms', 'screenCapture'].forEach(function (s) {
+      $(s).classList.remove('active');
+    });
+    $(id).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function buildMapJson() {
+    // The room's map: exact map_version-1 contract schema.
+    // ids/orders regenerated from list order so deletions never leave gaps.
+    return {
+      map_version: 1,
+      location_name: state.placeName + ' — ' + state.roomName,
+      created_at: state.createdAt,
+      waypoints: state.waypoints.map(function (w, i) {
+        return {
+          id: 'wp_' + (i + 1),
+          order: i + 1,
+          label: w.label,
+          notes: w.notes,
+          transition_from_previous: w.transition,
+          photo_base64: w.photo
+        };
+      })
+    };
+  }
+
+  function buildWrapper() {
+    return { place_name: state.placeName, room_name: state.roomName, map: buildMapJson() };
+  }
+
+  // ---------- draft safety net (never lose an unsaved room) ----------
+  function saveDraft() {
+    if (!state.waypoints.length) { clearDraft(); return; }
+    try {
+      localStorage.setItem(LS_DRAFT_KEY, JSON.stringify(buildWrapper()));
+    } catch (e) { /* quota — the room still lives in memory this session */ }
+  }
+  function clearDraft() {
+    try { localStorage.removeItem(LS_DRAFT_KEY); } catch (e) {}
+  }
+  function readDraft() {
+    try {
+      var raw = localStorage.getItem(LS_DRAFT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function importWrapper(w) {
+    state.placeName = w.place_name || 'Untitled place';
+    state.roomName = w.room_name || 'Untitled room';
+    var m = w.map || {};
+    state.createdAt = m.created_at || new Date().toISOString();
+    state.waypoints = (m.waypoints || []).map(function (x) {
+      return {
+        label: x.label || '',
+        notes: x.notes || '',
+        transition: x.transition_from_previous || '',
+        photo: x.photo_base64 || ''
+      };
+    });
+    state.pendingPhoto = null;
+    state.savedToServer = false;
+  }
+
+  function renderDraftCard() {
+    var d = readDraft();
+    var card = $('draftCard');
+    if (!d || !d.map || !d.map.waypoints || !d.map.waypoints.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    $('draftInfo').textContent = d.room_name + ' in "' + d.place_name + '" has ' + d.map.waypoints.length +
+      ' spot' + (d.map.waypoints.length === 1 ? '' : 's') + ' not saved to the server yet.';
+  }
+
+  $('resumeDraftBtn').addEventListener('click', function () {
+    var d = readDraft();
+    if (!d) { renderDraftCard(); return; }
+    importWrapper(d);
+    enterCaptureScreen();
+    toast('Continuing ' + state.roomName + '. Tap "Finish & Save room" when done.', 'ok');
+  });
+
+  $('discardDraftBtn').addEventListener('click', function () {
+    if (!confirm('Discard the unfinished room? Its photos will be lost.')) return;
+    clearDraft();
+    renderDraftCard();
+  });
+
+  // ---------- places screen ----------
+  var placesCache = [];
+
+  function renderPlaces() {
+    var ul = $('placesList');
+    var note = $('noPlacesNote');
+    note.textContent = 'Loading…';
+    note.style.display = 'block';
+    ul.innerHTML = '';
+    fetch('/api/places').then(function (res) {
+      if (!res.ok) throw new Error('server said ' + res.status);
+      return res.json();
+    }).then(function (places) {
+      placesCache = places;
+      if (!places.length) { note.textContent = 'No places yet. Add one above — e.g. "Amma\'s house".'; return; }
+      note.style.display = 'none';
+      places.forEach(function (pl) {
+        var li = document.createElement('li');
+        var b = document.createElement('button');
+        b.className = 'main';
+        var title = document.createElement('span');
+        title.textContent = pl.place_name;
+        var sub = document.createElement('span');
+        sub.className = 'sm';
+        var spots = pl.rooms.reduce(function (n, r) { return n + (r.waypoint_count || 0); }, 0);
+        sub.textContent = pl.rooms.length + ' room' + (pl.rooms.length === 1 ? '' : 's') + ' · ' + spots + ' spots mapped';
+        b.appendChild(title);
+        b.appendChild(sub);
+        b.addEventListener('click', function () { openPlace(pl.place_name); });
+        li.appendChild(b);
+        ul.appendChild(li);
+      });
+    }).catch(function (err) {
+      note.textContent = 'Could not reach the server (' + err.message + '). Check your internet and reload.';
+    });
+  }
+
+  $('newPlaceBtn').addEventListener('click', function () {
+    var name = $('placeInput').value.trim();
+    if (!name) { toast('Type a place name first.', 'error'); $('placeInput').focus(); return; }
+    $('placeInput').value = '';
+    openPlace(name);
+  });
+
+  function openPlace(name) {
+    state.placeName = name;
+    $('placeNameDisplay').textContent = name;
+    showScreen('screenRooms');
+    renderRooms();
+  }
+
+  $('roomsBackBtn').addEventListener('click', function () {
+    renderDraftCard();
+    renderPlaces();
+    showScreen('screenPlaces');
+  });
+
+  // ---------- rooms screen ----------
+  function renderRooms() {
+    var ul = $('roomsList');
+    var note = $('noRoomsNote');
+    ul.innerHTML = '';
+    note.textContent = 'Loading…';
+    note.style.display = 'block';
+    fetch('/api/places').then(function (res) {
+      if (!res.ok) throw new Error('server said ' + res.status);
+      return res.json();
+    }).then(function (places) {
+      placesCache = places;
+      var pl = places.find(function (p) { return p.place_name === state.placeName; });
+      var rooms = pl ? pl.rooms : [];
+      if (!rooms.length) {
+        note.textContent = 'Nothing mapped here yet. Pick a room above to begin.';
+        return;
+      }
+      note.style.display = 'none';
+      rooms.forEach(function (r) {
+        var li = document.createElement('li');
+        var b = document.createElement('button');
+        b.className = 'main';
+        var title = document.createElement('span');
+        title.textContent = r.room_name;
+        var sub = document.createElement('span');
+        sub.className = 'sm';
+        sub.textContent = r.waypoint_count + ' spot' + (r.waypoint_count === 1 ? '' : 's') + ' · tap to add more';
+        b.appendChild(title);
+        b.appendChild(sub);
+        b.addEventListener('click', function () { loadRoom(r.map_id); });
+        var del = document.createElement('button');
+        del.className = 'del';
+        del.textContent = '✕';
+        del.setAttribute('aria-label', 'Delete room ' + r.room_name);
+        del.addEventListener('click', function () {
+          if (!confirm('Delete the map of "' + r.room_name + '"? Its photos will be removed from the server.')) return;
+          fetch('/api/maps/' + encodeURIComponent(r.map_id), { method: 'DELETE' }).then(function (res) {
+            if (!res.ok) throw new Error('server said ' + res.status);
+            toast('Removed ' + r.room_name + '.', 'ok');
+            renderRooms();
+          }).catch(function (err) {
+            toast('Could not delete: ' + err.message, 'error');
+          });
+        });
+        li.appendChild(b);
+        li.appendChild(del);
+        ul.appendChild(li);
+      });
+    }).catch(function (err) {
+      note.textContent = 'Could not reach the server (' + err.message + ').';
+    });
+  }
+
+  // room quick-pick chips
+  ROOM_SUGGESTIONS.forEach(function (name) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = name;
+    b.addEventListener('click', function () { $('roomInput').value = name; });
+    $('roomChips').appendChild(b);
+  });
+
+  $('startRoomBtn').addEventListener('click', function () {
+    var room = $('roomInput').value.trim();
+    if (!room) { toast('Type or pick a room name first.', 'error'); $('roomInput').focus(); return; }
+    var d = readDraft();
+    if (d && d.map && d.map.waypoints && d.map.waypoints.length) {
+      if (!confirm('There is an unfinished room ("' + d.room_name + '" in ' + d.place_name + '"). Starting a new one will discard it. Continue?')) return;
+      clearDraft();
+    }
+    // If this room already exists on the server, append to it instead of overwriting.
+    var pl = placesCache.find(function (p) { return p.place_name === state.placeName; });
+    var existing = pl && pl.rooms.find(function (r) { return r.room_name.toLowerCase() === room.toLowerCase(); });
+    if (existing) { loadRoom(existing.map_id); return; }
+
+    state.roomName = room;
+    state.createdAt = new Date().toISOString();
+    state.waypoints = [];
+    state.pendingPhoto = null;
+    state.savedToServer = false;
+    $('roomInput').value = '';
+    enterCaptureScreen();
+  });
+
+  function loadRoom(mapId) {
+    fetch('/api/maps/' + encodeURIComponent(mapId)).then(function (res) {
+      if (!res.ok) throw new Error('server said ' + res.status);
+      return res.json();
+    }).then(function (m) {
+      // Derive room name from cache (the map body carries only location_name).
+      var roomName = null;
+      placesCache.forEach(function (p) {
+        p.rooms.forEach(function (r) { if (r.map_id === mapId) roomName = r.room_name; });
+      });
+      importWrapper({ place_name: state.placeName, room_name: roomName || 'Room', map: m });
+      state.savedToServer = true;
+      $('roomInput').value = '';
+      enterCaptureScreen();
+      toast('Loaded ' + state.roomName + ' — new spots will be added to it.', 'ok');
+    }).catch(function (err) {
+      toast('Could not load that room: ' + err.message, 'error');
+    });
+  }
+
+  // ---------- settings ----------
+  $('saveKeyBtn').addEventListener('click', function () {
+    var k = $('apiKeyInput').value.trim();
+    if (!k) { toast('Paste a key first.', 'error'); return; }
+    try {
+      localStorage.setItem(LS_API_KEY, k);
+      toast('API key saved on this device.', 'ok');
+    } catch (e) { toast('Could not save key: ' + e.message, 'error'); }
+  });
+
+  $('clearKeyBtn').addEventListener('click', function () {
+    try { localStorage.removeItem(LS_API_KEY); } catch (e) {}
+    $('apiKeyInput').value = '';
+    toast('API key cleared.', 'ok');
+  });
+
+  // ---------- capture screen ----------
+  function enterCaptureScreen() {
+    $('roomNameDisplay').textContent = state.placeName + ' · ' + state.roomName;
+    renderWpList();
+    hidePendingForm(true);
+    showScreen('screenCapture');
+    startCamera();
+  }
+
+  $('captureBackBtn').addEventListener('click', function () {
+    if ((state.waypoints.length && !state.savedToServer) || state.pendingPhoto) {
+      var ok = confirm('This room is not saved to the server yet. It will be kept on this phone so you can continue later. Go back?');
+      if (!ok) return;
+      saveDraft();
+    }
+    stopCamera();
+    showScreen('screenRooms');
+    renderRooms();
+  });
+
+  // spot quick-pick chips
+  SPOT_SUGGESTIONS.forEach(function (name) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = name;
+    b.addEventListener('click', function () { $('wpLabel').value = name; });
+    $('labelChips').appendChild(b);
+  });
+
+  // ---------- camera ----------
+  function startCamera() {
+    stopCamera();
+    cameraFailed = false;
+    $('cameraError').style.display = 'none';
+    $('cameraWrap').style.display = 'block';
+    $('captureBtn').style.display = 'flex';
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      cameraUnavailable('This browser does not support live camera access (or the page is not on HTTPS).');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    }).then(function (s) {
+      stream = s;
+      var v = $('cameraVideo');
+      v.srcObject = s;
+      var p = v.play();
+      if (p && p.catch) p.catch(function () { /* autoplay quirks; muted+playsinline usually suffice */ });
+    }).catch(function (err) {
+      cameraUnavailable(err && err.name === 'NotAllowedError'
+        ? 'Camera permission was denied. Allow it in your browser settings, or use the button below.'
+        : 'Could not open the camera (' + (err && err.name || 'unknown error') + ').');
+    });
+  }
+
+  function cameraUnavailable(msg) {
+    cameraFailed = true;
+    $('cameraWrap').style.display = 'none';
+    $('captureBtn').style.display = 'none';
+    $('cameraErrorMsg').textContent = ' ' + msg + ' ';
+    $('cameraError').style.display = 'block';
+  }
+
+  function stopCamera() {
+    if (stream) {
+      try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+      stream = null;
+    }
+    var v = $('cameraVideo');
+    if (v) v.srcObject = null;
+  }
+
+  // Downscale any drawable source to <= MAX_EDGE long edge, JPEG 0.7 data URL.
+  function downscaleToDataUrl(source, srcW, srcH) {
+    var scale = Math.min(1, MAX_EDGE / Math.max(srcW, srcH));
+    var w = Math.max(1, Math.round(srcW * scale));
+    var h = Math.max(1, Math.round(srcH * scale));
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(source, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', JPEG_QUALITY);
+  }
+
+  $('captureBtn').addEventListener('click', function () {
+    try {
+      var v = $('cameraVideo');
+      if (!v.videoWidth || !v.videoHeight) {
+        toast('Camera is still starting — try again in a second.', 'error');
+        return;
+      }
+      state.pendingPhoto = downscaleToDataUrl(v, v.videoWidth, v.videoHeight);
+      showPendingForm();
+    } catch (e) {
+      toast('Capture failed: ' + e.message, 'error');
+    }
+  });
+
+  // File-input fallback path (camera denied / unsupported)
+  $('fileFallbackInput').addEventListener('change', function (ev) {
+    var file = ev.target.files && ev.target.files[0];
+    ev.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+
+    function fromImageElement() {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        try {
+          state.pendingPhoto = downscaleToDataUrl(img, img.naturalWidth, img.naturalHeight);
+          showPendingForm();
+        } catch (e) { toast('Could not process photo: ' + e.message, 'error'); }
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); toast('Could not read that photo.', 'error'); };
+      img.src = url;
+    }
+
+    // Prefer createImageBitmap so EXIF orientation is respected.
+    if (window.createImageBitmap) {
+      createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) {
+        try {
+          state.pendingPhoto = downscaleToDataUrl(bmp, bmp.width, bmp.height);
+          showPendingForm();
+        } catch (e) { toast('Could not process photo: ' + e.message, 'error'); }
+        if (bmp.close) bmp.close();
+      }).catch(fromImageElement);
+    } else {
+      fromImageElement();
+    }
+  });
+
+  // ---------- pending waypoint form ----------
+  function showPendingForm() {
+    $('pendingThumb').src = state.pendingPhoto;
+    $('transitionLabel').textContent = state.waypoints.length === 0
+      ? 'How to get here from the room entrance'
+      : 'How to get here from the previous spot (#' + state.waypoints.length + ')';
+    $('cameraSection').style.display = 'none';
+    $('pendingSection').style.display = 'block';
+    $('aiDescribeBtn').style.display = getApiKey() ? 'flex' : 'none';
+    $('wpLabel').focus();
+    window.scrollTo(0, 0);
+  }
+
+  function hidePendingForm(clearInputs) {
+    $('pendingSection').style.display = 'none';
+    $('cameraSection').style.display = 'block';
+    if (clearInputs) {
+      $('wpLabel').value = '';
+      $('wpNotes').value = '';
+      $('wpTransition').value = '';
+    }
+  }
+
+  $('retakeBtn').addEventListener('click', function () {
+    // Keep typed label/notes/transition so nothing is lost across a retake.
+    state.pendingPhoto = null;
+    hidePendingForm(false);
+    if (cameraFailed) startCamera(); // re-attempt in case permission changed
+  });
+
+  $('saveWpBtn').addEventListener('click', function () {
+    var label = $('wpLabel').value.trim();
+    if (!label) { toast('Say what this spot is (e.g. Fridge).', 'error'); $('wpLabel').focus(); return; }
+    if (!state.pendingPhoto) { toast('No photo captured for this spot.', 'error'); return; }
+    state.waypoints.push({
+      label: label,
+      notes: $('wpNotes').value.trim(),
+      transition: $('wpTransition').value.trim(),
+      photo: state.pendingPhoto
+    });
+    state.pendingPhoto = null;
+    state.savedToServer = false;
+    hidePendingForm(true);
+    renderWpList();
+    saveDraft(); // photos survive even if the tab dies before "Finish & Save"
+    toast('Spot ' + state.waypoints.length + ' saved.', 'ok');
+  });
+
+  // ---------- AI describe (optional) ----------
+  $('aiDescribeBtn').addEventListener('click', function () {
+    var key = getApiKey();
+    if (!key) { toast('Set a Claude API key in Settings first.', 'error'); return; }
+    if (!state.pendingPhoto) { toast('No photo to describe.', 'error'); return; }
+
+    var btn = $('aiDescribeBtn');
+    btn.classList.add('busy');
+    btn.disabled = true;
+    btn.textContent = '✨ Describing…';
+
+    var rawBase64 = state.pendingPhoto.replace(/^data:image\/jpeg;base64,/, '');
+
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 300,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: rawBase64 } },
+            { type: 'text', text: 'This photo is a spot inside a room, on an indoor map for a blind person. In ONE sentence, describe the key visible landmarks and any hazards (steps, obstacles, cords, furniture edges, wet floors). Reply with only that sentence.' }
+          ]
+        }]
+      })
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (body) {
+          var msg = 'API error ' + res.status;
+          try { msg += ': ' + (JSON.parse(body).error.message || ''); } catch (e) {}
+          throw new Error(msg);
+        });
+      }
+      return res.json();
+    }).then(function (data) {
+      var text = '';
+      (data.content || []).forEach(function (part) {
+        if (part.type === 'text') text += part.text;
+      });
+      text = text.trim();
+      if (!text) throw new Error('Empty response from model.');
+      var notes = $('wpNotes');
+      // Append rather than overwrite so hand-typed notes are never lost.
+      notes.value = notes.value.trim() ? notes.value.trim() + ' ' + text : text;
+      toast('Description added to notes — please review it.', 'ok');
+    }).catch(function (err) {
+      toast('AI describe failed: ' + err.message, 'error');
+    }).finally(function () {
+      btn.classList.remove('busy');
+      btn.disabled = false;
+      btn.textContent = '✨ AI describe photo';
+    });
+  });
+
+  // ---------- waypoint (spot) list ----------
+  function renderWpList() {
+    var ul = $('wpList');
+    ul.innerHTML = '';
+    $('noWpNote').style.display = state.waypoints.length ? 'none' : 'block';
+    $('finishBtn').disabled = state.waypoints.length === 0;
+    $('wpCount').textContent = state.waypoints.length + ' spot' + (state.waypoints.length === 1 ? '' : 's');
+
+    state.waypoints.forEach(function (w, i) {
+      var li = document.createElement('li');
+      var img = document.createElement('img');
+      img.src = w.photo;
+      img.alt = w.label;
+      var meta = document.createElement('div');
+      meta.className = 'wp-meta';
+      var lab = document.createElement('div');
+      lab.className = 'wp-label';
+      lab.textContent = (i + 1) + '. ' + w.label;
+      var sub = document.createElement('div');
+      sub.className = 'wp-sub';
+      sub.textContent = w.transition || (i === 0 ? 'room entrance' : 'no transition recorded');
+      meta.appendChild(lab);
+      meta.appendChild(sub);
+      var del = document.createElement('button');
+      del.className = 'wp-del';
+      del.textContent = '✕';
+      del.setAttribute('aria-label', 'Delete spot ' + w.label);
+      del.addEventListener('click', function () {
+        if (!confirm('Delete spot "' + w.label + '"?')) return;
+        state.waypoints.splice(i, 1);
+        state.savedToServer = false;
+        renderWpList();
+        saveDraft();
+      });
+      li.appendChild(img);
+      li.appendChild(meta);
+      li.appendChild(del);
+      ul.appendChild(li);
+    });
+  }
+
+  // ---------- finish: save the room to the server ----------
+  $('finishBtn').addEventListener('click', function () {
+    if (!state.waypoints.length) { toast('Capture at least one spot first.', 'error'); return; }
+    var body;
+    try {
+      body = JSON.stringify(buildWrapper());
+    } catch (e) {
+      toast('Could not prepare the room: ' + e.message, 'error');
+      return;
+    }
+
+    var btn = $('finishBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    fetch('/api/maps', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: body
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        if (!res.ok) throw new Error(data.error || ('server said ' + res.status));
+        return data;
+      });
+    }).then(function () {
+      state.savedToServer = true;
+      clearDraft(); // it's safely on the server now
+      toast(state.roomName + ' saved! You can keep adding spots or go back for the next room.', 'ok');
+    }).catch(function (err) {
+      // The room stays in memory AND in the on-phone draft — nothing is lost.
+      saveDraft();
+      toast('Could not reach the server (' + err.message + '). The room is kept on this phone — tap "Finish & Save room" again when you have internet.', 'error');
+    }).finally(function () {
+      btn.disabled = false;
+      btn.textContent = '✅ Finish & Save room';
+    });
+  });
+
+  // ---------- boot ----------
+  try { $('apiKeyInput').value = getApiKey(); } catch (e) {}
+  renderDraftCard();
+  renderPlaces();
+
+  // Warn before accidentally closing the tab mid-room (draft still protects the photos).
+  window.addEventListener('beforeunload', function (e) {
+    if ((state.waypoints.length && !state.savedToServer) || state.pendingPhoto) {
+      saveDraft();
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+})();
+</script>
+</body>
+</html>

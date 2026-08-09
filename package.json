@@ -1,0 +1,16 @@
+{
+  "name": "pathmapper",
+  "version": "2.0.0",
+  "description": "PathMapper — caretaker indoor mapping (places → rooms → spots) for blind-navigation systems",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
